@@ -1,0 +1,64 @@
+<svg width="1280" height="720" viewBox="0 0 1280 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="40" x2="1120" y2="680" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF7F7"/>
+      <stop offset="1" stop-color="#F3F4F6"/>
+    </linearGradient>
+    <linearGradient id="card" x1="180" y1="120" x2="1100" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#FCFCFD"/>
+    </linearGradient>
+    <filter id="shadow" x="120" y="80" width="1040" height="600" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="18"/>
+      <feGaussianBlur stdDeviation="20"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0588 0 0 0 0 0.0941 0 0 0 0 0.1647 0 0 0 0.12 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_1"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_1" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <circle cx="1118" cy="116" r="112" fill="#FEE2E2"/>
+  <circle cx="1018" cy="620" r="84" fill="#FDE68A" fill-opacity="0.28"/>
+
+  <g filter="url(#shadow)">
+    <rect x="160" y="100" width="960" height="560" rx="34" fill="url(#card)"/>
+  </g>
+
+  <rect x="160" y="100" width="960" height="76" rx="34" fill="#FFFFFF"/>
+  <circle cx="212" cy="138" r="16" fill="#111827"/>
+  <text x="244" y="145" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700">DubbingAI</text>
+  <rect x="832" y="120" width="104" height="36" rx="18" fill="#F3F4F6"/>
+  <text x="862" y="143" fill="#374151" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600">KO / EN</text>
+  <rect x="960" y="120" width="126" height="36" rx="18" fill="#111827"/>
+  <text x="995" y="143" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600">Sign In</text>
+
+  <text x="220" y="236" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="42" font-weight="700">
+    Audio and video dubbing in one workspace
+  </text>
+  <text x="220" y="274" fill="#6B7280" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="400">
+    Upload media, review extracted text, and download the dubbed result.
+  </text>
+
+  <rect x="220" y="320" width="560" height="258" rx="28" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="2"/>
+  <text x="252" y="360" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Source / Result</text>
+  <rect x="252" y="388" width="240" height="152" rx="22" fill="#F9FAFB" stroke="#E5E7EB"/>
+  <text x="332" y="472" fill="#6B7280" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600">Original Media</text>
+  <rect x="508" y="388" width="240" height="152" rx="22" fill="#111827"/>
+  <text x="584" y="472" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600">Dubbed Output</text>
+
+  <rect x="820" y="320" width="248" height="258" rx="28" fill="#FFF7F7" stroke="#F3D4D4" stroke-width="2"/>
+  <text x="848" y="360" fill="#111827" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">Controls</text>
+  <rect x="848" y="390" width="190" height="42" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="876" y="417" fill="#374151" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600">Target Language</text>
+  <rect x="848" y="448" width="190" height="42" rx="14" fill="#FFFFFF" stroke="#E5E7EB"/>
+  <text x="891" y="475" fill="#374151" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600">Voice Choice</text>
+  <rect x="848" y="514" width="190" height="46" rx="23" fill="#111827"/>
+  <text x="901" y="543" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700">Start Dubbing</text>
+
+  <rect x="220" y="600" width="848" height="28" rx="14" fill="#F3F4F6"/>
+  <rect x="220" y="600" width="586" height="28" rx="14" fill="#111827"/>
+  <text x="220" y="74" fill="#9CA3AF" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="600">README Preview</text>
+</svg>

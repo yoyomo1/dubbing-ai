@@ -1,17 +1,19 @@
-# 더빙AI
+# DubbingAI
 
-오디오 업로드 후 `전사 -> 번역 -> 음성 합성 -> 다운로드` 흐름을 제공하는 Next.js 기반 음성 더빙 서비스입니다. `Google OAuth`, `화이트리스트 접근 제어`, `Turso 저장`, `Vercel 배포`를 중심으로 구성했습니다.
+DubbingAI is a Next.js-based dubbing service that supports the full flow of `transcription -> translation -> speech synthesis -> download` for uploaded audio or video files. The app is built around `Google OAuth`, allowlist-based access control, Turso-backed persistence, and an ElevenLabs + Gemini media pipeline.
 
-## 주요 기능
+![DubbingAI service preview](./public/readme-preview.svg)
 
-- 오디오/비디오 업로드 기반 음성 더빙
-- 품질 우선 기준으로 선별한 9개 언어 지원
-- ElevenLabs STT / TTS + Gemini 번역 파이프라인
-- Google 로그인 후 allowlist 기반 접근 제어
-- 관리자 allowlist 페이지에서 허용 이메일 추가/삭제
-- shadcn/ui + Radix 기반 상호작용 레이어
+## Features
 
-## 기술 스택
+- Audio and video dubbing from a single upload flow
+- 9 quality-first supported target languages
+- ElevenLabs STT / TTS and Gemini translation pipeline
+- Google sign-in with allowlist-based access control
+- Admin allowlist management page
+- shadcn/ui + Radix interaction layer
+
+## Tech Stack
 
 - Next.js 16 App Router
 - React 19
@@ -23,7 +25,7 @@
 - ElevenLabs API
 - Gemini Flash API
 
-## 로컬 실행
+## Local Development
 
 ```bash
 npm install
@@ -31,7 +33,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-필수 환경변수:
+Required environment variables:
 
 - `NEXTAUTH_SECRET`
 - `GOOGLE_CLIENT_ID`
@@ -41,51 +43,23 @@ npm run dev
 - `ELEVENLABS_API_KEY`
 - `GEMINI_API_KEY`
 
-환경변수가 일부 비어 있으면 화면은 뜨지만 실제 더빙은 mock 모드로 동작합니다.
+If some provider variables are missing, the UI still loads but dubbing falls back to mock mode.
 
-## 주요 페이지
+## Main Routes
 
-- `/` : 랜딩 + 실제 더빙 워크스페이스
-- `/login` : Google 로그인
-- `/blocked` : 미허용 계정 안내
-- `/admin/allowlist` : 관리자 allowlist 관리
+- `/` : landing page and dubbing workspace
+- `/login` : Google sign-in
+- `/blocked` : blocked account notice
+- `/admin/allowlist` : admin allowlist management
 
-## 배포
+## Coding Agent Workflow
 
-1. GitHub 저장소에 push
-2. Vercel 프로젝트 연결
-3. Vercel 환경변수 등록 (`scripts/vercel-env-sync.sh`로 자동 입력 가능)
-4. 자동 배포 후 로그인/업로드/다운로드 검증
+- Reviewed the assignment PDF and locked the implementation scope
+- Reworked the product into a service-style dubbing experience
+- Built the interaction layer with shadcn/ui first
+- Implemented auth, allowlist, and dubbing APIs in sequence
 
-상세 자동배포 가이드: [Vercel Deploy Guide](docs/VERCEL_DEPLOY.md)
-
-배포 전 권장 점검:
-
-```bash
-npm run verify:release
-```
-
-Vercel env 자동 동기화:
-
-```bash
-bash scripts/vercel-env-sync.sh https://<your-vercel-domain>
-```
-
-실서비스 URL:
+## Links
 
 - GitHub: `https://github.com/yoyomo1/dubbing-ai`
-- Vercel: `https://dubbing-ai-web.vercel.app`
-
-## 코딩 에이전트 활용 방식
-
-- 요구사항 PDF 분석 후 구현 범위를 확정
-- 서비스형 음성 더빙 화면으로 UI 재설계
-- shadcn/ui 컴포넌트 레이어를 먼저 구축
-- 인증, allowlist, 더빙 API 순으로 구현
-
-## 제출 체크리스트
-
-- README에 서비스 소개, 주요 기능, 기술 스택, 실행 방법, 배포 URL 기재
-- GitHub 저장소 주소 제출
-- 홍보 게시글 URL 목록 제출
-- Vercel 배포 URL 제출
+- Live App: `https://dubbing-ai-web.vercel.app`
