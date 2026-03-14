@@ -54,7 +54,7 @@ npm run dev
 
 1. GitHub 저장소에 push
 2. Vercel 프로젝트 연결
-3. Vercel 환경변수에 `.env.example` 값 등록
+3. Vercel 환경변수 등록 (`scripts/vercel-env-sync.sh`로 자동 입력 가능)
 4. 자동 배포 후 로그인/업로드/다운로드 검증
 
 상세 자동배포 가이드: [Vercel Deploy Guide](docs/VERCEL_DEPLOY.md)
@@ -63,6 +63,12 @@ npm run dev
 
 ```bash
 npm run verify:release
+```
+
+Vercel env 자동 동기화:
+
+```bash
+bash scripts/vercel-env-sync.sh https://<your-vercel-domain>
 ```
 
 ## 코딩 에이전트 활용 방식
