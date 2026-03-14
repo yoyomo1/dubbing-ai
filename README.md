@@ -2,7 +2,7 @@
 
 DubbingAI is a Next.js-based dubbing service that supports the full flow of `transcription -> translation -> speech synthesis -> download` for uploaded audio or video files. The app is built around `Google OAuth`, allowlist-based access control, Turso-backed persistence, and an ElevenLabs + Gemini media pipeline.
 
-![DubbingAI service preview](./public/readme-preview.svg)
+<img width="1363" height="689" alt="Image" src="https://github.com/user-attachments/assets/82bbef3c-8ae5-4669-a114-7521b28b4939" />
 
 ## Features
 
