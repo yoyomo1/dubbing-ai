@@ -177,8 +177,7 @@ export function DubbingWorkspace({
     chooseVoice: isKorean ? "원하는 목소리를 선택하세요" : "Choose a voice",
     voiceDesc: isKorean ? "성별과 톤을 합친 목소리 옵션에서 바로 선택할 수 있습니다." : "Choose from combined voice gender and tone options.",
     startDubbing: isKorean ? "더빙 시작" : "Start Dubbing",
-    downloadAudio: isKorean ? "결과 다운로드" : "Download Audio",
-    downloadVideo: isKorean ? "비디오 다운로드" : "Download Video",
+    downloadResult: isKorean ? "결과 다운로드" : "Download Result",
     progress: isKorean ? "진행 상태" : "Progress",
     supportedLanguages: isKorean ? "지원 언어" : "Supported Languages",
     autoRecommended: isKorean ? "자동 추천" : "Auto Recommendation",
@@ -552,19 +551,14 @@ export function DubbingWorkspace({
                     )}
                     {t.startDubbing}
                   </Button>
-                  {resultAudioUrl ? (
+                  {resultMediaUrl ? (
                     <Button asChild variant="outline" size="lg">
-                      <a href={resultAudioUrl} download="dubbed-audio">
+                      <a
+                        href={resultMediaUrl}
+                        download={currentMediaType === "video" ? "dubbed-video.mp4" : "dubbed-audio"}
+                      >
                         <Download className="h-4 w-4" />
-                        {t.downloadAudio}
-                      </a>
-                    </Button>
-                  ) : null}
-                  {resultVideoUrl ? (
-                    <Button asChild variant="outline" size="lg">
-                      <a href={resultVideoUrl} download="dubbed-video.mp4">
-                        <Download className="h-4 w-4" />
-                        {t.downloadVideo}
+                        {t.downloadResult}
                       </a>
                     </Button>
                   ) : null}

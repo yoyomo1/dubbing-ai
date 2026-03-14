@@ -4,7 +4,7 @@
 
 ## 주요 기능
 
-- 오디오 업로드 기반 음성 더빙
+- 오디오/비디오 업로드 기반 음성 더빙
 - 품질 우선 기준으로 선별한 9개 언어 지원
 - ElevenLabs STT / TTS + Gemini 번역 파이프라인
 - Google 로그인 후 allowlist 기반 접근 제어
@@ -70,6 +70,11 @@ Vercel env 자동 동기화:
 ```bash
 bash scripts/vercel-env-sync.sh https://<your-vercel-domain>
 ```
+
+실서비스 URL:
+
+- GitHub: `https://github.com/yoyomo1/dubbing-ai`
+- Vercel: `https://dubbing-ai-web.vercel.app`
 
 ## 코딩 에이전트 활용 방식
 

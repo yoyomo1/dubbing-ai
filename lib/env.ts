@@ -1,4 +1,5 @@
 const DEFAULT_SECRET = "dev-secret-change-me";
+const USE_FREE_SAFE_ELEVENLABS_VOICES = true;
 
 const baseVoiceMap = {
   en: process.env.ELEVENLABS_VOICE_EN || "21m00Tcm4TlvDq8ikWAM",
@@ -24,18 +25,18 @@ const baseVoiceMap = {
 } as const;
 
 const curatedVoiceMap = {
-  NEUTRAL_BALANCED: "21m00Tcm4TlvDq8ikWAM",
-  NEUTRAL_WARM: "21m00Tcm4TlvDq8ikWAM",
-  NEUTRAL_BRIGHT: "EXAVITQu4vr4xnSDxMaL",
-  NEUTRAL_DEEP: "pNInz6obpgDQGcFmaJgB",
-  FEMALE_BALANCED: "21m00Tcm4TlvDq8ikWAM",
-  FEMALE_WARM: "21m00Tcm4TlvDq8ikWAM",
-  FEMALE_BRIGHT: "EXAVITQu4vr4xnSDxMaL",
-  FEMALE_DEEP: "MF3mGyEYCl7XYWbV9V6O",
-  MALE_BALANCED: "TxGEqnHWrfWFTfGW9XjX",
-  MALE_WARM: "ErXwobaYiN019PkySvjV",
-  MALE_BRIGHT: "TxGEqnHWrfWFTfGW9XjX",
-  MALE_DEEP: "pNInz6obpgDQGcFmaJgB",
+  NEUTRAL_BALANCED: "SAz9YHcvj6GT2YYXdXww",
+  NEUTRAL_WARM: "SAz9YHcvj6GT2YYXdXww",
+  NEUTRAL_BRIGHT: "FGY2WhTYpPnrIDTdsKH5",
+  NEUTRAL_DEEP: "JBFqnCBsd6RMkjVDRZzb",
+  FEMALE_BALANCED: "hpp4J3VqNfWAUOO0d1Us",
+  FEMALE_WARM: "hpp4J3VqNfWAUOO0d1Us",
+  FEMALE_BRIGHT: "FGY2WhTYpPnrIDTdsKH5",
+  FEMALE_DEEP: "EXAVITQu4vr4xnSDxMaL",
+  MALE_BALANCED: "CwhRBWXzGAHq8TQ4Fs17",
+  MALE_WARM: "JBFqnCBsd6RMkjVDRZzb",
+  MALE_BRIGHT: "TX3LPaxmHKxFdv7VOQHJ",
+  MALE_DEEP: "N2lVS1w4EtoT3dr4eOWO",
 } as const;
 
 function parseCsv(value: string | undefined) {
@@ -88,6 +89,10 @@ export function resolveVoiceId(
   const curatedFallback =
     curatedVoiceMap[`${genderKey}_${presetKey}` as keyof typeof curatedVoiceMap] ||
     curatedVoiceMap[`NEUTRAL_${presetKey}` as keyof typeof curatedVoiceMap];
+
+  if (USE_FREE_SAFE_ELEVENLABS_VOICES) {
+    return curatedFallback || languageVoice;
+  }
 
   return (
     languageGenderPreset ||

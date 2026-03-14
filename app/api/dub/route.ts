@@ -8,6 +8,10 @@ import type { VoiceGenderId, VoicePresetId, VoiceSpeedId } from "@/lib/constants
 
 export const runtime = "nodejs";
 
+function optionalFormValue(value: FormDataEntryValue | null) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 const requestSchema = z.object({
   mediaType: z.enum(["audio", "video"]),
   targetLanguage: z.string().min(2),
@@ -38,9 +42,9 @@ export async function POST(request: Request) {
   const payload = requestSchema.parse({
     mediaType,
     targetLanguage,
-    voicePreset,
-    voiceGender,
-    voiceSpeed,
+    voicePreset: optionalFormValue(voicePreset),
+    voiceGender: optionalFormValue(voiceGender),
+    voiceSpeed: optionalFormValue(voiceSpeed),
   });
 
   try {

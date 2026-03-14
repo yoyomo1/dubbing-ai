@@ -108,7 +108,7 @@ export async function synthesizeSpeech(
         "xi-api-key": env.elevenlabsApiKey,
       },
       body: JSON.stringify({
-        model_id: "eleven_multilingual_v2",
+        model_id: "eleven_flash_v2_5",
         text,
         voice_settings: {
           ...voiceSettingsByPreset[voicePreset],
@@ -120,7 +120,38 @@ export async function synthesizeSpeech(
   );
 
   if (!response.ok) {
-    throw new Error(`ElevenLabs synthesis failed with ${response.status}`);
+    const errorText = await response.text();
+    let detailMessage = "";
+
+    try {
+      const payload = JSON.parse(errorText) as {
+        detail?:
+          | string
+          | {
+              message?: string;
+              code?: string;
+              type?: string;
+            };
+      };
+
+      if (typeof payload.detail === "string") {
+        detailMessage = payload.detail;
+      } else if (payload.detail?.message) {
+        detailMessage = payload.detail.message;
+      }
+    } catch {
+      detailMessage = errorText.trim();
+    }
+
+    if (response.status === 402) {
+      throw new Error(
+        `ElevenLabs TTS credits are insufficient or payment is required (402).${detailMessage ? ` Details: ${detailMessage}` : ""}`,
+      );
+    }
+
+    throw new Error(
+      `ElevenLabs synthesis failed with ${response.status}.${detailMessage ? ` Details: ${detailMessage}` : ""}`,
+    );
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
