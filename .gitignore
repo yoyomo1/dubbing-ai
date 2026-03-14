@@ -1,0 +1,14 @@
+.next
+node_modules
+
+# Keep all env files out of git except the sample file.
+.env*
+!.env.example
+
+.vercel
+dist
+coverage
+*.log
+local.db
+local.db-*
+tsconfig.tsbuildinfo
