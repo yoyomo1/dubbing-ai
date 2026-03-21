@@ -39,12 +39,24 @@ import {
   type VoicePresetId,
   type VoiceSpeedId,
 } from "@/lib/constants";
-import { extractAudioFromVideo, muxAudioWithVideo } from "@/lib/media/client-ffmpeg";
+import {
+  extractAudioFromVideo,
+  getMediaDuration,
+  MAX_CLIENT_MEDIA_SECONDS,
+  muxAudioWithVideo,
+  trimAudioSegment,
+} from "@/lib/media/client-ffmpeg";
 
 const formSchema = z.object({
   targetLanguage: z.string().min(2),
   voiceProfile: z.string().min(2),
+  processingRange: z.enum(["full", "selected-range"]),
+  cropStartSeconds: z.coerce.number().min(0),
+  cropDurationSeconds: z.coerce.number().min(1).max(MAX_CLIENT_MEDIA_SECONDS),
 });
+
+type DubbingFormInput = z.input<typeof formSchema>;
+type DubbingFormValues = z.output<typeof formSchema>;
 
 function progressForStage(stage: JobStage) {
   const index = stageOrder.indexOf(stage);
@@ -62,6 +74,17 @@ function base64ToBlob(base64: string, mimeType: string) {
   return new Blob([bytes], { type: mimeType });
 }
 
+function formatDuration(seconds: number) {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(safeSeconds / 60);
+  const restSeconds = safeSeconds % 60;
+  return `${minutes}:${String(restSeconds).padStart(2, "0")}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
 export function DubbingWorkspace({
   canUseApp,
   hasGoogleAuth,
@@ -70,16 +93,20 @@ export function DubbingWorkspace({
   hasGoogleAuth: boolean;
 }) {
   const { locale } = useLocale();
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<DubbingFormInput, unknown, DubbingFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       targetLanguage: "en",
       voiceProfile: "neutral-balanced",
+      processingRange: "full",
+      cropStartSeconds: 0,
+      cropDurationSeconds: 60,
     },
   });
 
   const [selectedMedia, setSelectedMedia] = useState<File | null>(null);
   const [selectedMediaUrl, setSelectedMediaUrl] = useState<string | null>(null);
+  const [selectedMediaDuration, setSelectedMediaDuration] = useState<number | null>(null);
   const [jobStage, setJobStage] = useState<JobStage>("idle");
   const [transcript, setTranscript] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -99,13 +126,30 @@ export function DubbingWorkspace({
   useEffect(() => {
     if (!selectedMedia) {
       setSelectedMediaUrl(null);
+      setSelectedMediaDuration(null);
       return;
     }
 
     const url = URL.createObjectURL(selectedMedia);
     setSelectedMediaUrl(url);
 
-    return () => URL.revokeObjectURL(url);
+    let cancelled = false;
+    getMediaDuration(selectedMedia)
+      .then((duration) => {
+        if (!cancelled) {
+          setSelectedMediaDuration(duration);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedMediaDuration(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      URL.revokeObjectURL(url);
+    };
   }, [selectedMedia]);
 
   useEffect(() => {
@@ -119,6 +163,19 @@ export function DubbingWorkspace({
     };
   }, [resultAudioUrl, resultVideoUrl]);
 
+  useEffect(() => {
+    if (selectedMediaDuration === null) {
+      return;
+    }
+
+    const roundedDuration = Math.max(1, Math.floor(selectedMediaDuration));
+    form.setValue("cropStartSeconds", 0, { shouldDirty: false, shouldValidate: false });
+    form.setValue("cropDurationSeconds", Math.min(roundedDuration, MAX_CLIENT_MEDIA_SECONDS), {
+      shouldDirty: false,
+      shouldValidate: false,
+    });
+  }, [form, selectedMediaDuration]);
+
   const currentMediaType = useMemo(() => {
     if (!selectedMedia) return "audio";
     return selectedMedia.type.startsWith("video/") ? "video" : "audio";
@@ -129,7 +186,88 @@ export function DubbingWorkspace({
     jobStage === "synthesizing" ||
     jobStage === "muxing";
   const resultMediaUrl = currentMediaType === "video" ? resultVideoUrl : resultAudioUrl;
+  const selectedProcessingRange = form.watch("processingRange");
+  const shouldCropOnDevice = selectedProcessingRange === "selected-range";
+  const cropStartSeconds = form.watch("cropStartSeconds");
+  const cropDurationSeconds = form.watch("cropDurationSeconds");
+  const roundedMediaDuration = selectedMediaDuration ? Math.max(1, Math.floor(selectedMediaDuration)) : null;
+  const cropStartMax = roundedMediaDuration ? Math.max(0, roundedMediaDuration - 1) : MAX_CLIENT_MEDIA_SECONDS;
+  const cropStartValue =
+    typeof cropStartSeconds === "number" ? cropStartSeconds : Number(cropStartSeconds ?? 0) || 0;
+  const cropDurationValue =
+    typeof cropDurationSeconds === "number"
+      ? cropDurationSeconds
+      : Number(cropDurationSeconds ?? Math.min(roundedMediaDuration ?? MAX_CLIENT_MEDIA_SECONDS, MAX_CLIENT_MEDIA_SECONDS)) ||
+        Math.min(roundedMediaDuration ?? MAX_CLIENT_MEDIA_SECONDS, MAX_CLIENT_MEDIA_SECONDS);
+  const cropAvailableDuration = roundedMediaDuration
+    ? Math.max(1, Math.min(MAX_CLIENT_MEDIA_SECONDS, roundedMediaDuration - cropStartValue))
+    : MAX_CLIENT_MEDIA_SECONDS;
+  const cropEndValue = cropStartValue + cropDurationValue;
   const isKorean = locale === "ko";
+
+  useEffect(() => {
+    if (!shouldCropOnDevice || !roundedMediaDuration) {
+      return;
+    }
+
+    const safeStart = clamp(cropStartValue, 0, Math.max(0, roundedMediaDuration - 1));
+    const safeDuration = clamp(
+      cropDurationValue,
+      1,
+      Math.min(MAX_CLIENT_MEDIA_SECONDS, roundedMediaDuration - safeStart),
+    );
+
+    if (safeStart !== cropStartSeconds) {
+      form.setValue("cropStartSeconds", safeStart, { shouldDirty: true, shouldValidate: false });
+    }
+    if (safeDuration !== cropDurationSeconds) {
+      form.setValue("cropDurationSeconds", safeDuration, { shouldDirty: true, shouldValidate: false });
+    }
+  }, [cropDurationSeconds, cropDurationValue, cropStartSeconds, cropStartValue, form, roundedMediaDuration, shouldCropOnDevice]);
+
+  const applyCropRange = (start: number, duration: number) => {
+    if (!roundedMediaDuration) {
+      return;
+    }
+
+    const safeStart = clamp(Math.floor(start), 0, Math.max(0, roundedMediaDuration - 1));
+    const safeDuration = clamp(
+      Math.floor(duration),
+      1,
+      Math.min(MAX_CLIENT_MEDIA_SECONDS, roundedMediaDuration - safeStart),
+    );
+
+    form.setValue("cropStartSeconds", safeStart, { shouldDirty: true, shouldValidate: false });
+    form.setValue("cropDurationSeconds", safeDuration, { shouldDirty: true, shouldValidate: false });
+  };
+
+  const alignCropToFileEnd = () => {
+    if (!roundedMediaDuration) {
+      return;
+    }
+
+    const safeStart = clamp(cropStartValue, 0, Math.max(0, roundedMediaDuration - 1));
+    const remainingDuration = Math.min(MAX_CLIENT_MEDIA_SECONDS, roundedMediaDuration - safeStart);
+    applyCropRange(safeStart, remainingDuration);
+  };
+
+  const applyFirstMinutePreset = () => {
+    if (!roundedMediaDuration) {
+      return;
+    }
+
+    applyCropRange(0, Math.min(roundedMediaDuration, MAX_CLIENT_MEDIA_SECONDS));
+  };
+
+  const applyLastMinutePreset = () => {
+    if (!roundedMediaDuration) {
+      return;
+    }
+
+    const start = Math.max(0, roundedMediaDuration - MAX_CLIENT_MEDIA_SECONDS);
+    applyCropRange(start, roundedMediaDuration - start);
+  };
+
   const t = {
     brand: isKorean ? "더빙AI" : "DubbingAI",
     heroTitle: isKorean
@@ -168,6 +306,46 @@ export function DubbingWorkspace({
     uploadTitle: isKorean ? "오디오 또는 비디오 업로드" : "Upload Audio or Video",
     uploadFormats: isKorean ? "입력 형식: .mp4, .mov, .mp3, .wav, .aac" : "Formats: .mp4, .mov, .mp3, .wav, .aac",
     recommendedLength: isKorean ? "권장 길이 90초 이하" : "Recommended length: under 90 seconds",
+    processingRange: isKorean ? "처리 범위" : "Processing Range",
+    chooseProcessingRange: isKorean ? "처리 범위를 선택하세요" : "Select processing range",
+    processingRangeDesc: isKorean
+      ? "대용량 파일이나 모바일 환경에서는 앞 1분만 처리하면 더 안정적으로 동작합니다."
+      : "For large files or mobile devices, processing only the first minute is more reliable.",
+    processFullFile: isKorean ? "전체 파일 처리" : "Process full file",
+    processFirstMinute: isKorean ? "선택 구간 처리" : "Process selected range",
+    cropStart: isKorean ? "시작 시간(초)" : "Start time (sec)",
+    cropDuration: isKorean ? "선택 길이(초)" : "Selected length (sec)",
+    cropRangeDesc: isKorean
+      ? "선택 구간은 최대 60초까지만 처리됩니다."
+      : "The selected range can be up to 60 seconds.",
+    cropRangeGuide: isKorean
+      ? "숫자 입력이 불편하면 아래 슬라이더나 빠른 선택 버튼을 사용하세요."
+      : "Use the sliders or quick actions below if typing numbers is inconvenient.",
+    cropRangeCurrent: (start: number, end: number) =>
+      isKorean
+        ? `현재 선택 구간 ${formatDuration(start)} ~ ${formatDuration(end)}`
+        : `Selected range ${formatDuration(start)} ~ ${formatDuration(end)}`,
+    cropRangeLength: (duration: number) =>
+      isKorean ? `선택 길이 ${formatDuration(duration)}` : `Selected length ${formatDuration(duration)}`,
+    cropRangeFileLength: (duration: number) =>
+      isKorean ? `파일 길이 ${formatDuration(duration)}` : `File length ${formatDuration(duration)}`,
+    cropAlignToEnd: isKorean ? "영상 끝까지 맞추기" : "Extend to file end",
+    cropPresetFirstMinute: isKorean ? "처음 1분" : "First minute",
+    cropPresetLastMinute: isKorean ? "마지막 1분" : "Last minute",
+    cropPreset15: isKorean ? "15초" : "15 sec",
+    cropPreset30: isKorean ? "30초" : "30 sec",
+    cropPreset45: isKorean ? "45초" : "45 sec",
+    cropPreset60: isKorean ? "60초" : "60 sec",
+    cropRangeInvalid: isKorean
+      ? "선택 구간은 0초 이상이고 최대 60초 이내여야 합니다."
+      : "The selected range must start at 0 or later and be no longer than 60 seconds.",
+    cropRangeBeyondFile: isKorean
+      ? "선택 구간이 파일 길이를 초과합니다."
+      : "The selected range exceeds the file duration.",
+    cropDetected: (duration: number) =>
+      isKorean
+        ? `현재 파일 길이 ${formatDuration(duration)} · 선택한 구간만 업로드 전에 기기에서 잘라 처리`
+        : `Current file length ${formatDuration(duration)} · only the selected range will be cropped on-device before upload`,
     chooseFile: isKorean ? "파일 선택" : "Choose File",
     changeFile: isKorean ? "파일 변경" : "Change File",
     targetLanguage: isKorean ? "타겟 언어" : "Target Language",
@@ -199,7 +377,7 @@ export function DubbingWorkspace({
   };
   const stageLabels: Record<JobStage, string> = {
     idle: isKorean ? "대기" : "Idle",
-    extracting: isKorean ? "비디오 오디오 추출" : "Extracting video audio",
+    extracting: isKorean ? "기기에서 미디어 준비 중" : "Preparing media on device",
     transcribing: "ElevenLabs STT",
     translating: isKorean ? "번역 모델 처리" : "Translating",
     synthesizing: "ElevenLabs TTS",
@@ -232,7 +410,7 @@ export function DubbingWorkspace({
     return speed ? (isKorean ? speed.labelKo : speed.labelEn) : id;
   };
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: DubbingFormValues) {
     if (!selectedMedia) {
       toast.error(t.fileRequired);
       return;
@@ -258,10 +436,43 @@ export function DubbingWorkspace({
     try {
       let uploadFile = selectedMedia;
       const mediaType = currentMediaType;
+      if (shouldCropOnDevice) {
+        if (
+          values.cropStartSeconds < 0 ||
+          values.cropDurationSeconds <= 0 ||
+          values.cropDurationSeconds > MAX_CLIENT_MEDIA_SECONDS
+        ) {
+          toast.error(t.cropRangeInvalid);
+          return;
+        }
+
+        if (
+          selectedMediaDuration !== null &&
+          values.cropStartSeconds + values.cropDurationSeconds > selectedMediaDuration
+        ) {
+          toast.error(t.cropRangeBeyondFile);
+          return;
+        }
+      }
+
+      const trimOptions =
+        shouldCropOnDevice
+          ? {
+              startTimeSeconds: values.cropStartSeconds,
+              durationSeconds: values.cropDurationSeconds,
+            }
+          : undefined;
 
       if (mediaType === "video") {
         setJobStage("extracting");
-        uploadFile = await extractAudioFromVideo(selectedMedia);
+        uploadFile = await extractAudioFromVideo(selectedMedia, trimOptions);
+      } else if (trimOptions) {
+        setJobStage("extracting");
+        uploadFile = await trimAudioSegment(
+          selectedMedia,
+          trimOptions.startTimeSeconds,
+          trimOptions.durationSeconds,
+        );
       }
 
       setJobStage("transcribing");
@@ -314,7 +525,7 @@ export function DubbingWorkspace({
 
       if (mediaType === "video") {
         setJobStage("muxing");
-        const muxedVideo = await muxAudioWithVideo(selectedMedia, audioBlob);
+        const muxedVideo = await muxAudioWithVideo(selectedMedia, audioBlob, trimOptions);
         setResultVideoUrl(URL.createObjectURL(muxedVideo));
       }
 
@@ -485,9 +696,12 @@ export function DubbingWorkspace({
                       )}
                     </>
                   </FormControl>
+                  {shouldCropOnDevice && selectedMediaDuration ? (
+                    <FormDescription>{t.cropDetected(selectedMediaDuration)}</FormDescription>
+                  ) : null}
                 </FormItem>
 
-                <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                <div className="grid gap-4 md:grid-cols-[1fr_1fr_1fr]">
                   <FormField
                     control={form.control}
                     name="targetLanguage"
@@ -540,7 +754,148 @@ export function DubbingWorkspace({
                     )}
                   />
 
+                  <FormField
+                    control={form.control}
+                    name="processingRange"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t.processingRange}</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="h-12">
+                              <SelectValue placeholder={t.chooseProcessingRange} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="full">{t.processFullFile}</SelectItem>
+                            <SelectItem value="selected-range">{t.processFirstMinute}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>{t.processingRangeDesc}</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                 </div>
+
+                {shouldCropOnDevice ? (
+                  <div className="space-y-4 rounded-[28px] border border-[var(--border)] bg-[var(--panel-strong)] p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={applyFirstMinutePreset}>
+                        {t.cropPresetFirstMinute}
+                      </Button>
+                      {roundedMediaDuration && roundedMediaDuration > MAX_CLIENT_MEDIA_SECONDS ? (
+                        <Button type="button" variant="outline" size="sm" onClick={applyLastMinutePreset}>
+                          {t.cropPresetLastMinute}
+                        </Button>
+                      ) : null}
+                      <Button type="button" variant="ghost" size="sm" onClick={alignCropToFileEnd}>
+                        {t.cropAlignToEnd}
+                      </Button>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                    <FormField
+                      control={form.control}
+                      name="cropStartSeconds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t.cropStart}</FormLabel>
+                          <FormControl>
+                            <Input
+                              min={0}
+                              max={cropStartMax}
+                              step={1}
+                              type="number"
+                              name={field.name}
+                              value={cropStartValue}
+                              onBlur={field.onBlur}
+                              onChange={(event) => field.onChange(event.target.value)}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <input
+                            className="mt-3 w-full accent-[var(--accent)]"
+                            max={cropStartMax}
+                            min={0}
+                            step={1}
+                            type="range"
+                            value={cropStartValue}
+                            onChange={(event) => field.onChange(event.target.value)}
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="cropDurationSeconds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t.cropDuration}</FormLabel>
+                          <FormControl>
+                            <Input
+                              min={1}
+                              max={cropAvailableDuration}
+                              step={1}
+                              type="number"
+                              name={field.name}
+                              value={cropDurationValue}
+                              onBlur={field.onBlur}
+                              onChange={(event) => field.onChange(event.target.value)}
+                              ref={field.ref}
+                            />
+                          </FormControl>
+                          <input
+                            className="mt-3 w-full accent-[var(--accent)]"
+                            max={cropAvailableDuration}
+                            min={1}
+                            step={1}
+                            type="range"
+                            value={cropDurationValue}
+                            onChange={(event) => field.onChange(event.target.value)}
+                          />
+                          <FormDescription>{t.cropRangeDesc}</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { label: t.cropPreset15, value: 15 },
+                        { label: t.cropPreset30, value: 30 },
+                        { label: t.cropPreset45, value: 45 },
+                        { label: t.cropPreset60, value: 60 },
+                      ].map((preset) => {
+                        const isDisabled = preset.value > cropAvailableDuration;
+                        const isActive = cropDurationValue === preset.value;
+
+                        return (
+                        <Button
+                          key={preset.value}
+                          type="button"
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          disabled={isDisabled}
+                          onClick={() => applyCropRange(cropStartValue, preset.value)}
+                        >
+                          {preset.label}
+                        </Button>
+                        );
+                      })}
+                    </div>
+                    <div className="space-y-1 text-sm text-[var(--muted-foreground)]">
+                      <p>{t.cropRangeGuide}</p>
+                      <p>{t.cropRangeCurrent(cropStartValue, cropEndValue)}</p>
+                      <p>
+                        {t.cropRangeLength(cropDurationValue)}
+                        {roundedMediaDuration ? ` · ${t.cropRangeFileLength(roundedMediaDuration)}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="flex flex-wrap gap-3">
                   <Button type="submit" size="lg" disabled={!selectedMedia || isProcessing}>
